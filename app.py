@@ -712,32 +712,18 @@ footer.svelte-1ipelgc {
 # =========================================================
 
 with gr.Blocks(
+    css=CUSTOM_CSS,
+    theme=gr.themes.Glass(),
     analytics_enabled=False,
 ) as demo:
 
     demo.queue()
-    VISITOR_FILE = "visitor_count.txt"
     
-    def get_visitor_count():
-        if not os.path.exists(VISITOR_FILE):
-            with open(VISITOR_FILE, "w") as f:
-                f.write("0")
-
-        with open(VISITOR_FILE, "r") as f:
-            count = int(f.read())
-
-        return count
+    
+    
 
 
-def increment_visitor_count():
 
-    count = get_visitor_count() + 1
-
-    with open(VISITOR_FILE, "w") as f:
-        f.write(str(count))
-
-    return count
-    visitor_count = increment_visitor_count()
     gr.HTML(
     f"""
     <div class='main-card'>
@@ -745,8 +731,6 @@ def increment_visitor_count():
 
         <div class='hero-sub'>
         AI Powered Booking Agent • DeepSeek Intelligence • Smart Scheduling
-        <br><br>
-        👀 Total Visitors: <b>{visitor_count}</b>
         </div>
     """
 )
@@ -910,16 +894,8 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
 
 demo.launch(
-    favicon_path=None,
     server_name="0.0.0.0",
     server_port=int(os.environ.get("PORT", 7860)),
     share=False,
     show_error=True,
-    theme=gr.themes.Glass(
-        primary_hue="cyan",
-        secondary_hue="blue",
-        neutral_hue="slate",
-        radius_size="lg"
-    ),
-    css=CUSTOM_CSS,
 )
