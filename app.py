@@ -9,8 +9,7 @@ from email.mime.multipart import MIMEMultipart
 
 import gradio as gr
 import requests
-from dotenv import load_dotenv
-load_dotenv()
+
 # =========================================================
 # PROFESSIONAL CLEANING SERVICES AI BOOKING AGENT
 # =========================================================
