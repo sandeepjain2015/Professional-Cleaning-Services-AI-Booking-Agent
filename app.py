@@ -2,11 +2,8 @@ import os
 import json
 import sqlite3
 import re
-import smtplib
+import resend
 from datetime import datetime, timedelta
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
 import gradio as gr
 import requests
 
@@ -429,6 +426,11 @@ def save_booking_to_db(
 # =========================================================
 
 
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+
+resend.api_key = RESEND_API_KEY
+
+
 def send_booking_email(
     service,
     city,
@@ -441,87 +443,69 @@ def send_booking_email(
     notes,
 ):
 
-    addons_text = ", ".join(addons) if addons else "No add-ons"
-
-    formatted_date = format_booking_date(date)
-
-    customer_subject = "✨ Your Cleaning Booking is Confirmed"
-
-    customer_html = f"""
-    <h2>Professional Cleaning Services</h2>
-
-    <p>Hello <b>{name}</b>,</p>
-
-    <p>Your booking has been received successfully.</p>
-
-    <h3>Booking Details</h3>
-
-    <ul>
-        <li><b>Service:</b> {service}</li>
-        <li><b>City:</b> {city}</li>
-        <li><b>Category:</b> {category}</li>
-        <li><b>Add-ons:</b> {addons_text}</li>
-        <li><b>Preferred Service Date:</b> {formatted_date}</li>
-    </ul>
-
-    <p>Our team will contact you shortly.</p>
-    """
-
-    admin_subject = f"🧼 New Booking from {name}"
-
-    admin_html = f"""
-    <h2>New Cleaning Booking</h2>
-
-    <ul>
-        <li><b>Name:</b> {name}</li>
-        <li><b>Phone:</b> {phone}</li>
-        <li><b>Email:</b> {email}</li>
-        <li><b>Service:</b> {service}</li>
-        <li><b>City:</b> {city}</li>
-        <li><b>Category:</b> {category}</li>
-        <li><b>Add-ons:</b> {addons_text}</li>
-        <li><b>Preferred Service Date:</b> {formatted_date}</li>
-        <li><b>Notes:</b> {notes}</li>
-    </ul>
-    """
-
     try:
 
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
+        addons_text = ", ".join(addons) if addons else "No add-ons selected"
 
-        server.starttls()
+        formatted_date = format_booking_date(date)
 
-        server.login(SMTP_EMAIL, SMTP_PASSWORD)
+        customer_html = f"""
+        <div style="font-family:Arial;padding:20px;">
+            <h2>✨ Booking Confirmed</h2>
 
-        customer_msg = MIMEMultipart()
+            <p>Hello <b>{name}</b>,</p>
 
-        customer_msg["From"] = SMTP_EMAIL
-        customer_msg["To"] = email
-        customer_msg["Subject"] = customer_subject
+            <p>Your cleaning booking has been received successfully.</p>
 
-        customer_msg.attach(MIMEText(customer_html, "html"))
+            <h3>Booking Details</h3>
 
-        server.sendmail(
-            SMTP_EMAIL,
-            email,
-            customer_msg.as_string(),
-        )
+            <ul>
+                <li><b>Service:</b> {service}</li>
+                <li><b>City:</b> {city}</li>
+                <li><b>Category:</b> {category}</li>
+                <li><b>Add-ons:</b> {addons_text}</li>
+                <li><b>Date:</b> {formatted_date}</li>
+            </ul>
 
-        admin_msg = MIMEMultipart()
+            <p>Our team will contact you shortly.</p>
 
-        admin_msg["From"] = SMTP_EMAIL
-        admin_msg["To"] = ADMIN_EMAIL
-        admin_msg["Subject"] = admin_subject
+            <p>Thank you for choosing us.</p>
+        </div>
+        """
 
-        admin_msg.attach(MIMEText(admin_html, "html"))
+        admin_html = f"""
+        <div style="font-family:Arial;padding:20px;">
+            <h2>🧼 New Cleaning Booking</h2>
 
-        server.sendmail(
-            SMTP_EMAIL,
-            ADMIN_EMAIL,
-            admin_msg.as_string(),
-        )
+            <ul>
+                <li><b>Name:</b> {name}</li>
+                <li><b>Phone:</b> {phone}</li>
+                <li><b>Email:</b> {email}</li>
+                <li><b>Service:</b> {service}</li>
+                <li><b>City:</b> {city}</li>
+                <li><b>Category:</b> {category}</li>
+                <li><b>Add-ons:</b> {addons_text}</li>
+                <li><b>Date:</b> {formatted_date}</li>
+                <li><b>Notes:</b> {notes}</li>
+            </ul>
+        </div>
+        """
 
-        server.quit()
+        # Customer Email
+        resend.Emails.send({
+            "from": "Cleaning Service <onboarding@resend.dev>",
+            "to": [email],
+            "subject": "✨ Your Booking is Confirmed",
+            "html": customer_html,
+        })
+
+        # Admin Email
+        resend.Emails.send({
+            "from": "Cleaning Service <onboarding@resend.dev>",
+            "to": ["mr.sandeepmcscet@gmail.com"],
+            "subject": f"🧼 New Booking from {name}",
+            "html": admin_html,
+        })
 
         return "✅ Emails sent successfully"
 
