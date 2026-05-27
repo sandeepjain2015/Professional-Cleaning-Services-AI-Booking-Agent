@@ -30,7 +30,7 @@ ADMIN_EMAIL = EMAIL_ADDRESS
 # DATABASE
 # =========================================================
 
-DB_NAME = "cleaning_bookings.db"
+DB_NAME = "/tmp/cleaning_bookings.db"
 
 
 def init_db():
@@ -173,30 +173,44 @@ def search_cleaning_trends(service, city):
 
 
 def generate_ai_summary(service, city, category, addons):
+    """Generate intelligent booking summary using DeepSeek"""
 
-    addons_text = ", ".join(addons) if addons else "No add-ons"
+    addons_text = ", ".join(addons) if addons else "No add-ons selected"
 
     market_context = search_cleaning_trends(service, city)
 
+    # Fallback if API key missing
     if not DEEPSEEK_API_KEY:
         return f"""
 ## 🤖 AI Booking Summary
 
-- Service: {service}
-- City: {city}
-- Property: {category}
-- Add-ons: {addons_text}
+### Service Details
+- **Service:** {service}
+- **City:** {city}
+- **Property Type:** {category}
+- **Add-ons:** {addons_text}
 
-### Recommended Plan
-- Estimated Duration: 3-5 Hours
-- Recommended Crew: 2 Cleaners
-- Priority: High
+---
 
-Premium cleaning experience confirmed.
+### Estimated Cleaning Information
+- ⏱ Estimated Duration: 3–5 Hours
+- 👥 Recommended Team Size: 2 Cleaners
+- ⭐ Priority Level: High
+
+---
+
+### Preparation Tips
+- Please ensure property access is available.
+- Remove valuable or fragile items before service.
+- Secure pets if required.
+
+---
+
+### Recommendation
+Eco-friendly deep sanitisation is highly recommended for premium results.
 """
 
     try:
-
         url = "https://api.deepseek.com/chat/completions"
 
         headers = {
@@ -205,23 +219,26 @@ Premium cleaning experience confirmed.
         }
 
         prompt = f"""
+You are an AI cleaning consultant.
+
 Customer Booking:
-Service: {service}
-City: {city}
-Property: {category}
-Add-ons: {addons_text}
+- Service: {service}
+- City: {city}
+- Property Type: {category}
+- Addons: {addons_text}
 
 Market Research:
 {market_context}
 
 Create:
 1. Professional summary
-2. Duration estimate
-3. Crew recommendation
-4. Cleaning checklist
-5. Customer tips
+2. Estimated cleaning duration
+3. Recommended cleaning crew size
+4. Cleaning checklist highlights
+5. Customer preparation tips
+6. Premium recommendation
 
-Use markdown.
+Use beautiful markdown formatting.
 """
 
         payload = {
@@ -229,7 +246,7 @@ Use markdown.
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a professional cleaning consultant.",
+                    "content": "You are a luxury cleaning service AI assistant.",
                 },
                 {
                     "role": "user",
@@ -247,14 +264,54 @@ Use markdown.
             timeout=60,
         )
 
+        # Prevent Railway crash
+        if response.status_code != 200:
+            return f"""
+## ⚠️ AI Service Temporarily Unavailable
+
+Booking was still created successfully.
+
+### Booking Details
+- Service: {service}
+- City: {city}
+- Property Type: {category}
+- Add-ons: {addons_text}
+
+Please try again later for AI recommendations.
+"""
+
         data = response.json()
+
+        # Extra protection
+        if "choices" not in data:
+            return f"""
+## ⚠️ AI Summary Currently Unavailable
+
+Your booking has been received successfully.
+
+### Service
+- {service}
+- {city}
+- {category}
+"""
 
         return data["choices"][0]["message"]["content"]
 
     except Exception as e:
-        return f"AI generation error: {str(e)}"
+        return f"""
+## ⚠️ AI Generation Error
 
+Your booking was successfully processed.
 
+### Error
+{str(e)}
+
+### Booking Details
+- Service: {service}
+- City: {city}
+- Property Type: {category}
+- Add-ons: {addons_text}
+"""
 # =========================================================
 # HELPERS
 # =========================================================
@@ -642,6 +699,8 @@ with gr.Blocks(
     analytics_enabled=False,
 ) as demo:
 
+    demo.queue()
+
     gr.Markdown(
         """
 # 🧼 Professional Cleaning Services
@@ -784,8 +843,11 @@ with gr.Blocks(
 
 if __name__ == "__main__":
 
+    port = int(os.environ.get("PORT", 7860))
+
     demo.launch(
-    server_name="0.0.0.0",
-    server_port=int(os.environ.get("PORT", 7860)),
-    show_error=True,
-)
+        server_name="0.0.0.0",
+        server_port=port,
+        share=False,
+        show_error=True,
+    )
