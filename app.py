@@ -671,6 +671,40 @@ footer {
 footer.svelte-1ipelgc {
     display: none !important;
 }
+/* =========================================
+   LOADING ANIMATION
+========================================= */
+
+.generate-loader {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+
+    color: white;
+    font-size: 18px;
+    font-weight: 600;
+
+    margin-top: 20px;
+}
+
+.loader-spinner {
+    width: 22px;
+    height: 22px;
+
+    border: 3px solid rgba(255,255,255,0.2);
+    border-top: 3px solid #00b4ff;
+
+    border-radius: 50%;
+
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
 """
 
 # =========================================================
@@ -684,14 +718,40 @@ with gr.Blocks(
 ) as demo:
 
     demo.queue()
+    VISITOR_FILE = "visitor_count.txt"
+    
+    def get_visitor_count():
+        if not os.path.exists(VISITOR_FILE):
+            with open(VISITOR_FILE, "w") as f:
+                f.write("0")
 
-    gr.Markdown(
-        """
-# 🧼 Professional Cleaning Services
+        with open(VISITOR_FILE, "r") as f:
+            count = int(f.read())
 
-### AI Powered Smart Booking Platform
-"""
-    )
+        return count
+
+
+def increment_visitor_count():
+
+    count = get_visitor_count() + 1
+
+    with open(VISITOR_FILE, "w") as f:
+        f.write(str(count))
+
+    return count
+    visitor_count = increment_visitor_count()
+    gr.HTML(
+    f"""
+    <div class='main-card'>
+        <div class='hero-title'>🧼 Professional Cleaning Services</div>
+
+        <div class='hero-sub'>
+        AI Powered Booking Agent • DeepSeek Intelligence • Smart Scheduling
+        <br><br>
+        👀 Total Visitors: <b>{visitor_count}</b>
+        </div>
+    """
+)
 
     # STEP 1
 
@@ -767,7 +827,7 @@ with gr.Blocks(
         )
 
         clear_btn = gr.Button("🧹 Clear Form")
-
+    loading_html = gr.HTML(visible=False)
     output = gr.Markdown()
 
     # EVENTS
@@ -778,7 +838,26 @@ with gr.Blocks(
         outputs=addon_checkbox,
     )
 
+    def show_loader():
+        return gr.update(
+            value="""
+            <div class="generate-loader">
+                <div class="loader-spinner"></div>
+                Generating AI Cleaning Summary...
+            </div>
+            """,
+            visible=True,
+        )
+
+
+    def hide_loader():
+        return gr.update(visible=False)
+
+
     generate_btn.click(
+        fn=show_loader,
+        outputs=loading_html,
+    ).then(
         fn=create_booking_summary,
         inputs=[
             service_dropdown,
@@ -792,6 +871,9 @@ with gr.Blocks(
             customer_notes,
         ],
         outputs=output,
+    ).then(
+        fn=hide_loader,
+        outputs=loading_html,
     )
 
     clear_btn.click(
