@@ -174,7 +174,7 @@ def search_cleaning_trends(service, city):
 
 def generate_ai_summary(service, city, category, addons):
     """Generate intelligent booking summary using DeepSeek"""
-
+    print("Generating AI summary...")
     addons_text = ", ".join(addons) if addons else "No add-ons selected"
 
     market_context = search_cleaning_trends(service, city)
@@ -558,14 +558,14 @@ def create_booking_summary(
     formatted_date = format_booking_date(date)
 
     addons_text = ", ".join(addons) if addons else "No add-ons"
-
+    print("Generating AI summary...")
     ai_response = generate_ai_summary(
         service,
         city,
         category,
         addons,
     )
-
+    print("Saving booking...")
     booking_id = save_booking_to_db(
         service,
         city,
@@ -577,7 +577,7 @@ def create_booking_summary(
         email,
         notes,
     )
-
+    print("Sending email...")
     email_status = send_booking_email(
         service,
         city,
@@ -589,7 +589,7 @@ def create_booking_summary(
         email,
         notes,
     )
-
+    print("Email sent...")
     return f"""
 # ✨ Booking Confirmed
 
