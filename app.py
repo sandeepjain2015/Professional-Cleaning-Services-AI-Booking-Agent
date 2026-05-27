@@ -712,8 +712,6 @@ footer.svelte-1ipelgc {
 # =========================================================
 
 with gr.Blocks(
-    css=CUSTOM_CSS,
-    theme=gr.themes.Glass(),
     analytics_enabled=False,
 ) as demo:
 
@@ -912,8 +910,16 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
 
 demo.launch(
+    favicon_path=None,
     server_name="0.0.0.0",
     server_port=int(os.environ.get("PORT", 7860)),
     share=False,
     show_error=True,
+    theme=gr.themes.Glass(
+        primary_hue="cyan",
+        secondary_hue="blue",
+        neutral_hue="slate",
+        radius_size="lg"
+    ),
+    css=CUSTOM_CSS,
 )
