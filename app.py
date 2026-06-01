@@ -341,6 +341,106 @@ def validate_phone(phone):
     return False
 
 
+def clean_voice_phone(transcript):
+    if not transcript or not isinstance(transcript, str):
+        return ""
+    
+    # Try using DeepSeek if key is available
+    if DEEPSEEK_API_KEY:
+        try:
+            url = "https://api.deepseek.com/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            prompt = (
+                "Extract and format the phone number from this speech transcription. "
+                "Respond with ONLY the clean phone number (e.g., +61412345678 or 0412345678) and nothing else. "
+                "If no phone number is present, return the original text.\n"
+                f"Transcription: {transcript}"
+            )
+            payload = {
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "You are a precise data extractor."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.0,
+                "max_tokens": 50,
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                result = response.json()["choices"][0]["message"]["content"].strip()
+                result = result.replace("`", "").strip()
+                if result:
+                    return result
+        except Exception as e:
+            print(f"DeepSeek phone extraction error: {e}")
+            
+    # Fallback parsing
+    text = transcript.lower()
+    word_to_digit = {
+        "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
+        "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+        "plus": "+"
+    }
+    # Replace spoken numbers
+    for word, digit in word_to_digit.items():
+        text = re.sub(rf"\b{word}\b", digit, text)
+    
+    # Keep only digits and '+'
+    cleaned = re.sub(r"[^0-9+]", "", text)
+    return cleaned
+
+
+def clean_voice_email(transcript):
+    if not transcript or not isinstance(transcript, str):
+        return ""
+        
+    # Try using DeepSeek if key is available
+    if DEEPSEEK_API_KEY:
+        try:
+            url = "https://api.deepseek.com/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            prompt = (
+                "Extract and format the email address from this speech transcription. "
+                "Respond with ONLY the clean email address (e.g., user@example.com) and nothing else. "
+                "If no email is present, return the original text.\n"
+                f"Transcription: {transcript}"
+            )
+            payload = {
+                "model": "deepseek-chat",
+                "messages": [
+                    {"role": "system", "content": "You are a precise data extractor."},
+                    {"role": "user", "content": prompt}
+                ],
+                "temperature": 0.0,
+                "max_tokens": 100,
+            }
+            response = requests.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code == 200:
+                result = response.json()["choices"][0]["message"]["content"].strip()
+                result = result.replace("`", "").strip()
+                if result:
+                    return result
+        except Exception as e:
+            print(f"DeepSeek email extraction error: {e}")
+            
+    # Fallback parsing
+    text = transcript.lower()
+    # Replace common spoken patterns for @ and .
+    text = text.replace(" at the rate ", "@")
+    text = text.replace(" at ", "@")
+    text = text.replace(" dot ", ".")
+    # Remove all spaces
+    cleaned = re.sub(r"\s+", "", text)
+    return cleaned
+
+
+
 def format_booking_date(date_value):
 
     try:
@@ -705,6 +805,23 @@ footer.svelte-1ipelgc {
         transform: rotate(360deg);
     }
 }
+
+#phone-voice-btn, #email-voice-btn {
+    margin-top: 24px !important;
+    height: 42px !important;
+    min-width: 120px !important;
+    background: #0f2f4d !important;
+    color: white !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+}
+
+#phone-voice-btn:hover, #email-voice-btn:hover {
+    background: #00b4ff !important;
+    border-color: #00b4ff !important;
+}
 """
 
 # =========================================================
@@ -783,15 +900,29 @@ with gr.Blocks(
         placeholder="Enter your full name",
     )
 
-    customer_phone = gr.Textbox(
-        label="📞 Phone Number",
-        placeholder="+61412345678",
-    )
+    with gr.Row():
+        customer_phone = gr.Textbox(
+            label="📞 Phone Number",
+            placeholder="+61412345678",
+            scale=4,
+        )
+        phone_voice_btn = gr.Button(
+            "🎤 Speak",
+            scale=1,
+            elem_id="phone-voice-btn",
+        )
 
-    customer_email = gr.Textbox(
-        label="📧 Email Address",
-        placeholder="your@email.com",
-    )
+    with gr.Row():
+        customer_email = gr.Textbox(
+            label="📧 Email Address",
+            placeholder="your@email.com",
+            scale=4,
+        )
+        email_voice_btn = gr.Button(
+            "🎤 Speak",
+            scale=1,
+            elem_id="email-voice-btn",
+        )
 
     customer_notes = gr.TextArea(
         label="📝 Additional Notes",
@@ -813,6 +944,84 @@ with gr.Blocks(
     output = gr.Markdown()
 
     # EVENTS
+
+    phone_voice_btn.click(
+        fn=clean_voice_phone,
+        inputs=[customer_phone],
+        outputs=customer_phone,
+        js="""
+        async () => {
+            const btn = document.getElementById("phone-voice-btn");
+            const originalText = btn.innerText;
+            btn.innerText = "Listening... 🎙️";
+            btn.style.backgroundColor = "#ff4b4b";
+            return new Promise((resolve) => {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    alert("Web Speech API is not supported in this browser. Please type manually.");
+                    btn.innerText = originalText;
+                    btn.style.backgroundColor = "";
+                    resolve("");
+                    return;
+                }
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'en-US';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+                recognition.onresult = (event) => {
+                    resolve(event.results[0][0].transcript);
+                };
+                recognition.onerror = (err) => {
+                    resolve("");
+                };
+                recognition.onend = () => {
+                    btn.innerText = originalText;
+                    btn.style.backgroundColor = "";
+                };
+                recognition.start();
+            });
+        }
+        """
+    )
+
+    email_voice_btn.click(
+        fn=clean_voice_email,
+        inputs=[customer_email],
+        outputs=customer_email,
+        js="""
+        async () => {
+            const btn = document.getElementById("email-voice-btn");
+            const originalText = btn.innerText;
+            btn.innerText = "Listening... 🎙️";
+            btn.style.backgroundColor = "#ff4b4b";
+            return new Promise((resolve) => {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    alert("Web Speech API is not supported in this browser. Please type manually.");
+                    btn.innerText = originalText;
+                    btn.style.backgroundColor = "";
+                    resolve("");
+                    return;
+                }
+                const recognition = new SpeechRecognition();
+                recognition.lang = 'en-US';
+                recognition.interimResults = false;
+                recognition.maxAlternatives = 1;
+                recognition.onresult = (event) => {
+                    resolve(event.results[0][0].transcript);
+                };
+                recognition.onerror = (err) => {
+                    resolve("");
+                };
+                recognition.onend = () => {
+                    btn.innerText = originalText;
+                    btn.style.backgroundColor = "";
+                };
+                recognition.start();
+            });
+        }
+        """
+    )
 
     service_dropdown.change(
         fn=load_addons,
