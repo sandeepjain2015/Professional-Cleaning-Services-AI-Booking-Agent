@@ -1099,9 +1099,11 @@ with gr.Blocks(
 # =========================================================
 
 if __name__ == "__main__":
+    demo.queue()
     demo.launch(
         server_name="0.0.0.0",
         server_port=int(os.environ.get("PORT", 8080)),
-        share=False,
         show_error=True,
+        share=False,
+        ssr_mode=False,
     )
