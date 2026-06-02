@@ -930,7 +930,7 @@ with gr.Blocks(
         lines=4,
     )
 
-    # BUTTONS.
+    # BUTTONS
 
     with gr.Row():
 
